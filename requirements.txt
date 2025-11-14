@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+pandas-datareader
+matplotlib
+plotly
+yfinance
+fredapi
+QuantLib
