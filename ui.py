@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 CSS = """
 <style>
+
 .stApp {
   background-image: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.5)),
                     url('https://media.istockphoto.com/id/1487894858/fr/photo/graphique-en-chandelier-et-données-du-marché-financier.jpg?s=612x612&w=0&k=20&c=tJoRghcmr2l10qJflJUkmY1kGjUqjccYGxiBSxRiQFc=');
@@ -12,7 +13,7 @@ CSS = """
   color: #fff;
 }
 
-/* Labels */
+/* ===== LABELS ===== */
 .stApp label,
 .stApp .stNumberInput label,
 .stApp .stDateInput label,
@@ -23,19 +24,19 @@ CSS = """
     font-weight: 700 !important;
 }
 
-/* Titres */
+/* ===== TITRES ===== */
 .stApp h1, .stApp h2, .stApp h3,
 .stApp h4, .stApp h5, .stApp h6 {
     color: white !important;
     font-weight: 700 !important;
 }
 
-/* Markdown */
+/* ===== TEXTE Markdown ===== */
 .stApp .stMarkdown p {
     color: white !important;
 }
 
-/* Valeurs metrics en blanc */
+/* ===== METRICS VALUE ===== */
 .stApp [data-testid="stMetricValue"] {
     color: white !important;
     font-weight: 700 !important;
@@ -67,4 +68,16 @@ def swap_inputs():
         amort = st.selectbox("Amortissement", ["Linéaire", "In Fine"])
         fixing = st.selectbox("Fixing", [f"J{n}" if n < 0 else "J" if n == 0 else f"J+{n}" for n in range(-1, 11)])
     notionnel = st.number_input("Notionnel €", 0, 1_000_000_000, 1_000_000)
-    indice = st.selectbox("Indice variable", ["Euribor", "Ester", "Libor", "SOFR", "
+    indice = st.selectbox("Indice variable", ["Euribor", "Ester", "Libor", "SOFR", "SONIA"])
+    return d0, d1, p_var, p_fix, amort, notionnel, indice, fixing
+
+def show_sofr_banner(series_id: str = "SOFR"):
+    try:
+        df = web.DataReader(series_id, "fred")
+        last_val = float(df.iloc[-1, 0])
+        last_dt = df.index[-1].date()
+        line = f"Dernier {series_id} publié — {last_dt}: {last_val:.2f}%"
+    except Exception as e:
+        st.warning(f"{series_id} non disponible : {e}")
+        line = f"Dernier {series_id} publié — N/A"
+    st.markdown(f'<p class="sofr-text">{line}</p>', unsafe_allow_html=True)
