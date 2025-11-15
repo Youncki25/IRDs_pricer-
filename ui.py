@@ -21,7 +21,7 @@ def sidebar() -> str:
         ("Accueil", "Pricer", "Graphique", "Risk Management", "Strategie de trading")
     )
 
-@
+
 def swap_inputs():
     col1, col2 = st.columns(2)
     with col1:
