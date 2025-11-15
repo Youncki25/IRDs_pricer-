@@ -19,7 +19,8 @@ from ta import amort_table
 import sofr_future as sf
 import ui as U
 from config import FRED_API_KEY, BF_API_KEY, APP_TITLE, APP_LAYOUT
-import Obligations_fixe
+from Obligations_fixe import FixedRateBond
+
 
 
 # --------------------- SOFR / SR3 helper ---------------------
