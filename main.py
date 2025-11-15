@@ -610,6 +610,8 @@ elif page == "Obligations":
             step=1,
         )
 
+
+
     if use_front_stub:
         first_date = st.date_input(
             "Date du premier coupon (front stub)",
@@ -724,6 +726,8 @@ elif page == "Obligations":
                 accrual_end = [p.accrual_end for p in bond.schedule.periods]
                 payment_dates = [p.payment_date for p in bond.schedule.periods]
                 dcfs = [p.accrual_dcf for p in bond.schedule.periods]
+                is_stub = [p.is_stub for p in bond.schedule.periods]
+                stub_type = [p.stub_type for p in bond.schedule.periods]
 
                 r_per = y_actu / freq
                 disc = 1.0 / (1.0 + r_per) ** periods
@@ -731,15 +735,26 @@ elif page == "Obligations":
 
                 df_sched = pd.DataFrame({
                     "Période": periods.astype(int),
-                    " start date": [d.to_date() for d in accrual_start],
-                    "end date": [d.to_date() for d in accrual_end],
+                    "Accrual start": [d.to_date() for d in accrual_start],
+                    "Accrual end": [d.to_date() for d in accrual_end],
                     "Payment date": [d.to_date() for d in payment_dates],
                     "DCF": dcfs,
                     "Temps (ans cumulés)": times_years,
                     "Cash-flow": cfs,
                     "Facteur d'actualisation": disc,
-                    "PV (actualisé)": pv,
-                })
+                    "Valeur actuelle": pv,
+                    # --- meta ajoutées ---
+                    "Stub?": is_stub,
+                    "Type de stub": stub_type,                        # front / back / regular
+                    "Calendrier accrual": bond.schedule.calendar_name,
+                    "Calendrier paiement": bond.schedule.payment_calendar_name,
+                    "BDC accrual": bond.schedule.bdc_name,
+                    "BDC paiement": bond.schedule.payment_bdc_name,
+                    "Day-count": bond.schedule.daycount_name,
+                    "Tenor (mois)": bond.schedule.tenor_months,
+                    "Payment lag (jours)": bond.schedule.payment_lag_days,
+                    "Fréquence théorique": bond.freq_label,
+        })
 
                 st.dataframe(
                     df_sched.style.format({

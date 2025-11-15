@@ -90,20 +90,3 @@ def load_us_inflation(start: str = "2000-01-01") -> pd.DataFrame:
 
 def fetch_fred_series(series_id: str, api_key: str = FRED_API_KEY) -> pd.DataFrame:
     """
-    Fallback via REST FRED (utile pour séries trimestrielles GDP, etc.).
-    Renvoie un DataFrame avec colonnes: ['date', 'value'].
-    """
-    url = (
-        "https://api.stlouisfed.org/fred/series/observations"
-        f"?series_id={series_id}&api_key={api_key}&file_type=json"
-    )
-
-    r = requests.get(url, timeout=15)
-    r.raise_for_status()
-    data = r.json()
-
-    df = pd.DataFrame(data["observations"])[["date", "value"]]
-    df["value"] = pd.to_numeric(df["value"], errors="coerce")
-    df["date"] = pd.to_datetime(df["date"])
-    return df.dropna()
-
