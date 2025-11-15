@@ -1,9 +1,12 @@
 streamlit
 pandas
 numpy
-pandas-datareader
-matplotlib
 plotly
-yfinance
-fredapi
 QuantLib
+scikit-learn
+matplotlib
+fredapi
+pandas-datareader
+yfinance
+requests
+scipy
