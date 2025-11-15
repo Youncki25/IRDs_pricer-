@@ -2,7 +2,7 @@ import streamlit as st
 import pandas_datareader.data as web
 from datetime import date, timedelta
 
-CSS = """
+CSS = CSS = """
 <style>
 .stApp {
   background-image: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.5)),
@@ -11,9 +11,43 @@ CSS = """
   background-attachment: fixed;
   color: #fff;
 }
-/* … le reste de votre CSS existant … */
+
+/* ============================== */
+/*   LABELS ET TITRES EN BLANC   */
+/* ============================== */
+
+.stApp label, 
+.stApp .stNumberInput label,
+.stApp .stDateInput label,
+.stApp .stCheckbox label,
+.stApp .stRadio label,
+.stApp .stMultiSelect label {
+    color: #FFFFFF !important;      
+    font-weight: 700 !important;    
+    font-size: 1.05rem !important;
+}
+
+/* Titres Streamlit (h1–h6) */
+.stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp h5, .stApp h6 {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+}
+
+/* Paragraphes Markdown */
+.stApp .stMarkdown p {
+    color: #FFFFFF !important;
+}
+
+/* ======================================= */
+/*   NE PAS TOUCHER AU TEXTE DES SELECTBOX */
+/* ======================================= */
+
+/* Donc : pas d'override ici */
+
 </style>
 """
+
 
 def sidebar() -> str:
     return st.sidebar.selectbox(
