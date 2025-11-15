@@ -2,8 +2,9 @@ import streamlit as st
 import pandas_datareader.data as web
 from datetime import date, timedelta
 
-CSS = CSS = """
+CSS = CSS = CSS = """
 <style>
+
 .stApp {
   background-image: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.5)),
                     url('https://media.istockphoto.com/id/1487894858/fr/photo/graphique-en-chandelier-et-données-du-marché-financier.jpg?s=612x612&w=0&k=20&c=tJoRghcmr2l10qJflJUkmY1kGjUqjccYGxiBSxRiQFc=');
@@ -12,48 +13,38 @@ CSS = CSS = """
   color: #fff;
 }
 
-/* ============================== */
-/*   LABELS ET TITRES EN BLANC   */
-/* ============================== */
-
-.stApp label, 
+/* Labels */
+.stApp label,
 .stApp .stNumberInput label,
 .stApp .stDateInput label,
 .stApp .stCheckbox label,
 .stApp .stRadio label,
 .stApp .stMultiSelect label {
-    color: #FFFFFF !important;      
-    font-weight: 700 !important;    
-    font-size: 1.05rem !important;
-}
-
-/* Titres Streamlit (h1–h6) */
-.stApp h1, .stApp h2, .stApp h3,
-.stApp h4, .stApp h5, .stApp h6 {
-    color: #FFFFFF !important;
-    font-weight: 700 !important;
-}
-
-/* Paragraphes Markdown */
-.stApp .stMarkdown p {
-    color: #FFFFFF !important;
-}
-
-/* ======================================= */
-/*   NE PAS TOUCHER AU TEXTE DES SELECTBOX */
-/* ======================================= */
-
-/* Donc : pas d'override ici */
-/* =========================================== */
-/*   TEXTE DE LA VALEUR SELECTIONNÉE (SELECTBOX) EN BLANC   */
-/* =========================================== */
-
-div[data-baseweb="select"] > div {
     color: white !important;
     font-weight: 700 !important;
 }
+
+/* Titres */
+.stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp h5, .stApp h6 {
+    color: white !important;
+    font-weight: 700 !important;
+}
+
+/* Markdown */
+.stApp .stMarkdown p {
+    color: white !important;
+}
+
+/* METRICS : valeur chiffrée en blanc */
+.stApp [data-testid="stMetricValue"] {
+    color: white !important;
+    font-weight: 700 !important;
+}
+
 </style>
 """
+
 
 
 def sidebar() -> str:
