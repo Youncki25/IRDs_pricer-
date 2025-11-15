@@ -1,0 +1,366 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import List, Optional
+from datetime import date
+
+import numpy as np
+import QuantLib as ql
+
+
+# pour avoir les convenations sur Quantlib
+def get_calendar(name: str) -> ql.Calendar:
+    name = name.lower()
+    if name in ("target", "eur", "euro"):
+        return ql.TARGET()
+    if name in ("france", "fr", "paris"):
+        return ql.France()
+    if name in ("uk", "london", "gb", "unitedkingdom"):
+        return ql.UnitedKingdom()
+    if name in ("us", "ny", "usa", "unitedstates"):
+        return ql.UnitedStates()
+    return ql.NullCalendar()
+
+
+def get_bdc(name: str):
+    name = name.lower()
+    if name in ("following", "follow", "f"):
+        return ql.Following
+    if name in ("modifiedfollowing", "mf"):
+        return ql.ModifiedFollowing
+    if name in ("preceding", "pre", "p"):
+        return ql.Preceding
+    if name in ("modifiedpreceding", "mp"):
+        return ql.ModifiedPreceding
+    if name in ("unadjusted", "ua"):
+        return ql.Unadjusted
+    return ql.ModifiedFollowing
+
+
+def get_daycount(name: str):
+    name = name.lower()
+    if name in ("act/360", "actual/360", "a/360"):
+        return ql.Actual360()
+    if name in ("act/365", "actual/365", "a/365", "act/365f"):
+        return ql.Actual365Fixed()
+    if name in ("30/360", "30e/360", "thirty360"):
+        return ql.Thirty360()
+    return ql.ActualActual()
+
+
+def get_rule(name: str):
+    name = name.lower()
+    return {
+        "forward": ql.DateGeneration.Forward,
+        "backward": ql.DateGeneration.Backward,
+        "twentieth": ql.DateGeneration.Twentieth,
+        "twentiethimm": ql.DateGeneration.TwentiethIMM,
+        "oldcds": ql.DateGeneration.OldCDS,
+        "cds": ql.DateGeneration.CDS,
+    }.get(name, ql.DateGeneration.Forward)
+
+
+def pydate_to_ql(d: date) -> ql.Date:
+    return ql.Date(d.day, d.month, d.year)
+
+
+# ===========================
+# Échéancier d'obligation
+# ===========================
+
+@dataclass
+class PaymentPeriod:
+    accrual_start: ql.Date
+    accrual_end: ql.Date
+    accrual_dcf: float
+    payment_date: ql.Date
+
+
+@dataclass
+class BondSchedule:
+    periods: List[PaymentPeriod]
+
+    @classmethod
+    def build(
+        cls,
+        issue_date: date,
+        maturity_date: date,
+        tenor_months: int,
+        calendar_name: str = "TARGET",
+        bdc_name: str = "ModifiedFollowing",
+        daycount_name: str = "ACT/365",
+        rule_name: str = "Forward",
+        end_of_month: bool = False,
+        # stubs optionnels :
+        first_date: Optional[date] = None,         # front stub date (première accrual end)
+        next_to_last_date: Optional[date] = None,  # back stub date (avant dernière accrual end)
+        payment_lag_days: int = 0,
+        payment_calendar_name: Optional[str] = None,
+        payment_bdc_name: Optional[str] = None,
+    ) -> "BondSchedule":
+        """
+        Construit un échéancier complet avec calendrier, daycount et éventuels stubs.
+        """
+
+        cal = get_calendar(calendar_name)
+        bdc = get_bdc(bdc_name)
+        dc = get_daycount(daycount_name)
+        rule = get_rule(rule_name)
+
+        ql_start = pydate_to_ql(issue_date)
+        ql_end = pydate_to_ql(maturity_date)
+        tenor = ql.Period(tenor_months, ql.Months)
+
+        ql_first = pydate_to_ql(first_date) if first_date else ql.Date()
+        ql_next_to_last = pydate_to_ql(next_to_last_date) if next_to_last_date else ql.Date()
+
+        sched = ql.Schedule(
+            ql_start,
+            ql_end,
+            tenor,
+            cal,
+            bdc,
+            bdc,
+            rule,
+            end_of_month,
+            ql_first,
+            ql_next_to_last,
+        )
+
+        pay_cal = get_calendar(payment_calendar_name) if payment_calendar_name else cal
+        pay_bdc = get_bdc(payment_bdc_name) if payment_bdc_name else bdc
+
+        periods: List[PaymentPeriod] = []
+        for i in range(len(sched) - 1):
+            d0 = sched[i]
+            d1 = sched[i + 1]
+            dcf = dc.yearFraction(d0, d1)
+
+            # date de paiement = end date + lag, ajustée selon calendrier de paiement
+            pay = d1
+            if payment_lag_days:
+                pay = pay + int(payment_lag_days)
+            pay = pay_cal.adjust(pay, pay_bdc)
+
+            periods.append(
+                PaymentPeriod(
+                    accrual_start=d0,
+                    accrual_end=d1,
+                    accrual_dcf=float(dcf),
+                    payment_date=pay,
+                )
+            )
+
+        return cls(periods=periods)
+
+    @property
+    def n_periods(self) -> int:
+        return len(self.periods)
+
+    @property
+    def total_years(self) -> float:
+        """Approximation de la maturité en années via la somme des DCF."""
+        return float(sum(p.accrual_dcf for p in self.periods))
+
+
+# ===========================
+# Obligation à taux fixe
+# ===========================
+
+@dataclass
+class FixedRateBond:
+    """
+    Obligation à taux fixe avec échéancier quantlib.
+    coupon_rate : taux annuel en décimal (5% -> 0.05)
+    redemption  : 1.0 = 100% du nominal
+    """
+    nominal: float
+    coupon_rate: float
+    schedule: BondSchedule
+    freq: int = 2          # fréquence "théorique" des coupons (pour le taux actuariel)
+    redemption: float = 1.0
+
+    # ------- Cash-flows générés par l'échéancier -------
+    def cashflows(self):
+        """
+        Retourne:
+          - periods: 1..N
+          - times: temps en années (somme cumulée des DCF)
+          - cfs: flux de trésorerie (coupons + remboursement final)
+        """
+        n = self.schedule.n_periods
+        periods = np.arange(1, n + 1, dtype=float)
+        dcfs = np.array([p.accrual_dcf for p in self.schedule.periods], dtype=float)
+        times = np.cumsum(dcfs)
+
+        # coupon proportionnel au DCF : Nominal * coupon_rate * DCF
+        coupons = self.nominal * self.coupon_rate * dcfs
+        cfs = coupons.copy()
+        # remboursement final
+        cfs[-1] += self.nominal * self.redemption
+
+        return periods, times, cfs
+
+    # ------- Pricing & risques -------
+    def price(self, yield_rate: float) -> float:
+        """
+        Prix de l'obligation pour un taux actuariel 'yield_rate'
+        (en décimal, ex: 0.04 pour 4%).
+
+        On utilise un schéma discret :
+          v = 1 / (1 + y/freq)^t
+        où t = nº de période (1,2,...).
+        Les périodes peuvent être stub, mais on garde la même fréquence
+        de capitalisation pour le taux actuariel.
+        """
+        periods, _, cfs = self.cashflows()
+        r_per = yield_rate / self.freq       # taux par période
+        disc = 1.0 / (1.0 + r_per) ** periods
+        pv = cfs * disc
+        return float(pv.sum()/self.nominal)
+
+    def macaulay_duration(self, yield_rate: float) -> float:
+        """
+        Duration de Macaulay (en années).
+        """
+        periods, times, cfs = self.cashflows()
+        r_per = yield_rate / self.freq
+        disc = 1.0 / (1.0 + r_per) ** periods
+        pv = cfs * disc
+        prix = float(pv.sum())
+        if prix == 0:
+            return float("nan")
+
+        macaulay = float((times * pv).sum() / prix)
+        return macaulay
+
+    def modified_duration(self, yield_rate: float) -> float:
+        """
+        Duration modifiée (en années).
+        """
+        macaulay = self.macaulay_duration(yield_rate)
+        r_per = yield_rate / self.freq
+        return macaulay / (1.0 + r_per)
+
+    def convexity(self, yield_rate: float) -> float:
+        """
+        Convexité annuelle (approx discrète).
+        """
+        periods, times, cfs = self.cashflows()
+        r_per = yield_rate / self.freq
+        disc = 1.0 / (1.0 + r_per) ** periods
+        pv = cfs * disc
+        prix = float(pv.sum())
+        if prix == 0:
+            return float("nan")
+
+        # t en nombre d'années (times), mais la formule discrete classique
+        # est souvent écrite sur les périodes; on reste cohérent ici avec times.
+        num = (pv * times * (times + 1.0)).sum()
+        conv = float(num / ((1 + r_per) ** 2 * prix))
+        return conv
+
+    def dv01(self, yield_rate: float) -> float:
+        """
+        DV01 ≈ variation de prix pour +1 bp sur le taux (en valeur absolue).
+        """
+        mod_dur = self.modified_duration(yield_rate)
+        price_0 = self.price(yield_rate)
+        dy = 1e-4  # 1 bp
+        dP = -mod_dur * price_0 * dy
+        return -dP
+
+    # ------- Helper pratique pour construire une oblig "en une ligne" -------
+    @classmethod
+    def from_dates(
+        cls,
+        nominal: float,
+        coupon_rate: float,
+        issue_date: date,
+        maturity_date: date,
+        freq: int,
+        calendar_name: str = "TARGET",
+        bdc_name: str = "ModifiedFollowing",
+        daycount_name: str = "ACT/365",
+        rule_name: str = "Forward",
+        end_of_month: bool = False,
+        first_date: Optional[date] = None,
+        next_to_last_date: Optional[date] = None,
+        payment_lag_days: int = 0,
+        payment_calendar_name: Optional[str] = None,
+        payment_bdc_name: Optional[str] = None,
+        redemption: float = 1.0,
+    ) -> "FixedRateBond":
+        """
+        Fabrique directement une oblig en construisant son échéancier QuantLib,
+        avec support de stub si first_date / next_to_last_date sont renseignés.
+        """
+        tenor_months = int(12 / freq)   # ex: freq=2 -> 6M; freq=1 -> 12M, etc.
+
+        schedule = BondSchedule.build(
+            issue_date=issue_date,
+            maturity_date=maturity_date,
+            tenor_months=tenor_months,
+            calendar_name=calendar_name,
+            bdc_name=bdc_name,
+            daycount_name=daycount_name,
+            rule_name=rule_name,
+            end_of_month=end_of_month,
+            first_date=first_date,
+            next_to_last_date=next_to_last_date,
+            payment_lag_days=payment_lag_days,
+            payment_calendar_name=payment_calendar_name,
+            payment_bdc_name=payment_bdc_name,
+        )
+
+        return cls(
+            nominal=nominal,
+            coupon_rate=coupon_rate,
+            schedule=schedule,
+            freq=freq,
+            redemption=redemption,
+        )
+
+
+
+
+# Obligation 7 ans EUR avec front stub court, coupons annuels
+issue = date(2025, 1, 15)
+maturity = date(2032, 1, 15)
+
+# Exemple de front stub: première date de coupon le 15/07/2025,
+# ensuite annuel classique
+first_coupon_date = date(2025, 7, 15)
+
+bond = FixedRateBond.from_dates(
+    nominal=100_000,
+    coupon_rate=0.04,                # 4% annuel
+    issue_date=issue,
+    maturity_date=maturity,
+    freq=1,                          # 1 coupon par an
+    calendar_name="TARGET",
+    bdc_name="ModifiedFollowing",
+    daycount_name="ACT/365",
+    rule_name="Forward",
+    end_of_month=False,
+    first_date=first_coupon_date,    # 👉 front stub
+    next_to_last_date=None,          # pas de back stub ici
+    payment_lag_days=2,              # J+2 pour payer
+    payment_calendar_name="TARGET",
+    payment_bdc_name="ModifiedFollowing",
+    redemption=1.0,
+)
+
+y = 0.035  # 3.5% de yield
+
+print("Prix      :", bond.price(y))
+print("MacDur   :", bond.macaulay_duration(y))
+print("ModDur   :", bond.modified_duration(y))
+print("Convexité:", bond.convexity(y))
+print("DV01     :", bond.dv01(y))
+
+# Et si tu veux voir l'échéancier :
+for i, p in enumerate(bond.schedule.periods, start=1):
+    print(
+        f"Per {i}: {p.accrual_start} -> {p.accrual_end}, "
+        f"DCF={p.accrual_dcf:.6f}, Pay={p.payment_date}"
+    )

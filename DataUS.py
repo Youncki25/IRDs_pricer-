@@ -107,4 +107,3 @@ def fetch_fred_series(series_id: str, api_key: str = FRED_API_KEY) -> pd.DataFra
     df["date"] = pd.to_datetime(df["date"])
     return df.dropna()
 
-
