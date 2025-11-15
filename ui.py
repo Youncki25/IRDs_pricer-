@@ -44,7 +44,14 @@ CSS = CSS = """
 /* ======================================= */
 
 /* Donc : pas d'override ici */
+/* =========================================== */
+/*   TEXTE DE LA VALEUR SELECTIONNÉE (SELECTBOX) EN BLANC   */
+/* =========================================== */
 
+div[data-baseweb="select"] > div {
+    color: white !important;
+    font-weight: 700 !important;
+}
 </style>
 """
 
