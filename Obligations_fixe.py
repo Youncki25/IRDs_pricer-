@@ -269,7 +269,6 @@ class FixedRateBond:
         dP = -mod_dur * price_0 * dy
         return -dP
 
-    # ------- Helper pratique pour construire une oblig "en une ligne" -------
     @classmethod
     def from_dates(
         cls,
@@ -323,44 +322,3 @@ class FixedRateBond:
 
 
 
-# Obligation 7 ans EUR avec front stub court, coupons annuels
-issue = date(2025, 1, 15)
-maturity = date(2032, 1, 15)
-
-# Exemple de front stub: première date de coupon le 15/07/2025,
-# ensuite annuel classique
-first_coupon_date = date(2025, 7, 15)
-
-bond = FixedRateBond.from_dates(
-    nominal=100_000,
-    coupon_rate=0.04,                # 4% annuel
-    issue_date=issue,
-    maturity_date=maturity,
-    freq=1,                          # 1 coupon par an
-    calendar_name="TARGET",
-    bdc_name="ModifiedFollowing",
-    daycount_name="ACT/365",
-    rule_name="Forward",
-    end_of_month=False,
-    first_date=first_coupon_date,    # 👉 front stub
-    next_to_last_date=None,          # pas de back stub ici
-    payment_lag_days=2,              # J+2 pour payer
-    payment_calendar_name="TARGET",
-    payment_bdc_name="ModifiedFollowing",
-    redemption=1.0,
-)
-
-y = 0.035  # 3.5% de yield
-
-print("Prix      :", bond.price(y))
-print("MacDur   :", bond.macaulay_duration(y))
-print("ModDur   :", bond.modified_duration(y))
-print("Convexité:", bond.convexity(y))
-print("DV01     :", bond.dv01(y))
-
-# Et si tu veux voir l'échéancier :
-for i, p in enumerate(bond.schedule.periods, start=1):
-    print(
-        f"Per {i}: {p.accrual_start} -> {p.accrual_end}, "
-        f"DCF={p.accrual_dcf:.6f}, Pay={p.payment_date}"
-    )

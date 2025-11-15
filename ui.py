@@ -18,7 +18,7 @@ CSS = """
 def sidebar() -> str:
     return st.sidebar.selectbox(
         "Choisissez une rubrique",
-        ("Accueil", "Pricer", "Graphique", "Risk Management", "Strategie de trading")
+        ("Accueil", "Pricer", "Graphique", "Risk Management", "Strategie de trading","Obligations")
     )
 
 
