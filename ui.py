@@ -2,9 +2,8 @@ import streamlit as st
 import pandas_datareader.data as web
 from datetime import date, timedelta
 
-CSS = CSS = CSS = """
+CSS = """
 <style>
-
 .stApp {
   background-image: linear-gradient(rgba(0,0,0,.5), rgba(0,0,0,.5)),
                     url('https://media.istockphoto.com/id/1487894858/fr/photo/graphique-en-chandelier-et-données-du-marché-financier.jpg?s=612x612&w=0&k=20&c=tJoRghcmr2l10qJflJUkmY1kGjUqjccYGxiBSxRiQFc=');
@@ -36,7 +35,7 @@ CSS = CSS = CSS = """
     color: white !important;
 }
 
-/* METRICS : valeur chiffrée en blanc */
+/* Valeurs metrics en blanc */
 .stApp [data-testid="stMetricValue"] {
     color: white !important;
     font-weight: 700 !important;
