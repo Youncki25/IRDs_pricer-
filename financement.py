@@ -1,7 +1,10 @@
-
 import streamlit as st
 from ta_emprunt import tableau_amortissement_emprunt
+from datetime import date
 
+def format_int(n):
+    """Affiche 1 000 000 au lieu de 1000000"""
+    return f"{int(n):,}".replace(",", " ")
 
 def render():
     st.header("📄 Tableau d'amortissement — Emprunt bancaire")
@@ -10,9 +13,10 @@ def render():
         "Montant emprunté",
         value=1_000_000,
         step=50_000,
-        format="%d",    # pour bien afficher 1 000 000 (entier, pas 100000.00)
+        format="%d",
         help="Montant du prêt (ex : 1 000 000 €)."
     )
+
     taux_pct = st.number_input(
         "Taux annuel (%)",
         value=4.0,
@@ -20,12 +24,19 @@ def render():
         format="%.2f",
         help="Ex : 4 pour 4%."
     )
+
+    date_debut = st.date_input(
+        "Date de début du prêt",
+        value=date(2026, 1, 1)
+    )
+
     duree = st.number_input(
         "Durée (années)",
         value=10,
         min_value=1,
         step=1
     )
+
     freq = st.selectbox(
         "Fréquence des paiements",
         [12, 4, 1],
@@ -34,16 +45,19 @@ def render():
     )
 
     if st.button("Générer le tableau", type="primary"):
-        taux = taux_pct / 100.0
+
+        taux = taux_pct / 100
 
         df = tableau_amortissement_emprunt(
             capital_initial=capital,
             taux_annuel=taux,
+            date_debut=date_debut,
             duree_annees=int(duree),
             paiements_par_an=int(freq)
         )
 
-        st.success("Tableau d'amortissement généré ✅")
+        st.success(f"Tableau d'amortissement généré pour un prêt de **{format_int(capital)} €** 💶")
+
         st.dataframe(df, use_container_width=True)
 
         st.download_button(
