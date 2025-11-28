@@ -7,6 +7,7 @@ import accueil
 import pricer
 import graphique
 import obligations
+import financement   # 👈 NEW
 
 
 # --------------------- App config & sidebar ---------------------
@@ -31,3 +32,7 @@ elif page == "Graphique":
 
 elif page == "Obligations":
     obligations.render()
+
+elif page == "Tableau amortissement pour financement":
+    financement.render()
+
