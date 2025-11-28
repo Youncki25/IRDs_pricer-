@@ -1,5 +1,5 @@
 # chemin 1 pour code avec enzo et chemin 2 code pour mon desktop
-#streamlit run "/Users/beldjenna/Desktop/GeoKapital-DashBoard/main.py"
+#streamlit run "C:\Users\youne\https-github.com-Youncki25-credit-rating-app\IRDs_pricer-"
 
 
 # streamlit run "/Users/beldjenna/Desktop/GeoKapital-DashBoard/main.py"
@@ -72,6 +72,31 @@ U.show_sofr_banner("SOFR")
 if page == "Accueil":
     st.header("Bienvenue !")
     st.write("Outils de trading et de gestion des risques.")
+    # === SECTION : A PROPOS DU PROJET ===
+    st.markdown("### 🧾 À propos du projet")
+
+    st.markdown(
+        """
+        Cette application a été développée pour **explorer la tarification et la gestion des risques
+        sur les produits de taux**, en s’appuyant sur Python, QuantLib et des **données de marché
+        en temps réel ou quasi temps réel**.
+
+        L’objectif du projet est double :
+
+        - fournir un **outil pratique et modulaire** permettant de pricer des **IRS, IRDs et obligations**
+        et de **construire des courbes de taux** aussi proches que possible de celles utilisées
+        sur les *trading floors* (méthodes d'interpolation, stripping, intégration de STIRs, SR3, OIS, etc.) ;
+
+        - offrir une **overview macro-financière mondiale**, obtenue via plusieurs API :  
+        **FRED**, **ECB Statistical Data Warehouse**, **Alpha Vantage**, **Quandl/Nasdaq Data Link**,  
+        et (optionnellement) **Refinitiv Eikon** lorsque disponible.
+
+        Grâce à ces sources, l’onglet *Macroéconomie* permet de récupérer des données
+        sur la croissance, l’inflation, la courbe des taux, les marchés monétaires
+        et d’autres indicateurs afin de replacer la courbe de taux dans un contexte global.
+        """
+    )
+
 
 # --------------------- Pricer ---------------------
 elif page == "Pricer":
