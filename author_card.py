@@ -2,33 +2,31 @@ import streamlit as st
 from PIL import Image
 from pathlib import Path
 
-
 def show_author_card():
     st.markdown("### 👤 À propos de l'auteur")
 
     col1, col2 = st.columns([1, 3])
 
     with col1:
-        # On construit un chemin relatif robuste :
-        # dossier courant du fichier + dossier assets + fichier younes.jpg
-        base_dir = Path(__file__).resolve().parent
-        img_path = base_dir / "Photos des créateurs" / "Younes Beldjenna Analyste Senior.jpg"
+        # Chemin EXACT de ta photo dans ton repo GitHub
+        img_path = Path("Photos des créateurs") / "Younes Beldjenna Analyste Senior.jpg.png"
 
-        if img_path.exists():
+        try:
             img = Image.open(img_path)
             st.image(img, width=130)
-        else:
-            st.write("📷 (Photo introuvable – vérifie le chemin `assets/younes.jpg`)")
+        except Exception as e:
+            st.error(f"Impossible de charger la photo : {e}")
+            st.write(f"Chemin utilisé : `{img_path}`")
 
     with col2:
         st.markdown(
             """
             **Younes Beldjenna**  
             Créateur de l'application *Desk Taux*  
-            Réalisée dans le cadre de son mémoire de Master en Banque & Finance.
+            Réalisée dans le cadre de son mémoire de M2.
 
-            📧 Email : [younes.beldjenna@gmail.com](mailto:younes.beldjenna@gmail.com)  
-            📞 Téléphone : 06 15 93 64 72
+            📧 : [younes.beldjenna@gmail.com](mailto:younes.beldjenna@gmail.com)  
+            📞 : 06 15 93 64 72
             """,
             unsafe_allow_html=True,
         )
