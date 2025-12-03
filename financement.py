@@ -1,6 +1,5 @@
 import streamlit as st
 from datetime import date
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -20,6 +19,57 @@ def format_eur(n: float, decimals: int = 2) -> str:
     """
     fmt = f"{{:,.{decimals}f}}".format(n)
     return fmt.replace(",", " ").replace(".", ",")
+
+
+def format_pct_fr(x: float, decimals: int = 2) -> str:
+    """
+    Format pour les pourcentages style FR : 4,25 %
+    x est en décimal (0.0425 -> 4,25 %)
+    """
+    s = f"{x * 100:.{decimals}f}".replace(".", ",")
+    return s + " %"
+
+
+# ---------- IRR maison pour le TAEG ----------
+
+def irr_periodique_bissection(cash_flows, freq, tol=1e-7, max_iter=100):
+    """
+    IRR par période via une méthode de bissection simple.
+    On cherche r dans [0, 1] (0% à 100% par période).
+    Renvoie None si pas de solution propre trouvée.
+    """
+
+    def npv(r):
+        total = 0.0
+        for t, cf in enumerate(cash_flows):
+            total += cf / ((1 + r) ** t)
+        return total
+
+    # Pour un prêt classique, NPV(0) > 0 (on reçoit le capital, on rembourse plus tard)
+    # et NPV(1) < 0 (taux énorme).
+    r_low, r_high = 0.0, 1.0
+    npv_low = npv(r_low)
+    npv_high = npv(r_high)
+
+    # Si on n’a pas de changement de signe, on ne tente pas plus loin.
+    if npv_low * npv_high > 0:
+        return None
+
+    for _ in range(max_iter):
+        r_mid = (r_low + r_high) / 2
+        npv_mid = npv(r_mid)
+
+        if abs(npv_mid) < tol:
+            return r_mid
+
+        if npv_low * npv_mid < 0:
+            r_high = r_mid
+            npv_high = npv_mid
+        else:
+            r_low = r_mid
+            npv_low = npv_mid
+
+    return (r_low + r_high) / 2
 
 
 # ---------- Page Streamlit ----------
@@ -60,10 +110,14 @@ def render():
         "Fréquence des paiements",
         [12, 4, 1],
         index=0,
-        format_func=lambda x: {12: "Mensuel (12)", 4: "Trimestriel (4)", 1: "Annuel (1)"}[x],
+        format_func=lambda x: {
+            12: "Mensuel (12)",
+            4: "Trimestriel (4)",
+            1: "Annuel (1)",
+        }[x],
     )
 
-    # 🔹 Nouveau : frais initiaux pour le TAEG
+    # 🔹 Frais initiaux pour le TAEG
     frais_initiaux = st.number_input(
         "Frais initiaux (en €)",
         min_value=0.0,
@@ -104,42 +158,46 @@ def render():
             f"— coût total des intérêts : **{format_eur(cout_interets_total)} €** 💶"
         )
 
-        # 🔹 🔹 TAEG (approximation par IRR) 🔹 🔹
+        # 🔹🔹 TAEG de VOTRE financement 🔹🔹
         cash_flows = [capital - frais_initiaux] + [-x for x in df["Mensualité (€)"]]
-        try:
-            irr_periodique = np.irr(cash_flows)
-        except Exception:
-            irr_periodique = None
 
-        if irr_periodique is not None and not np.isnan(irr_periodique):
-            taeg = (1 + irr_periodique) ** freq - 1
-            taeg_str = f"{taeg * 100:.2f}".replace(".", ",")
+        irr_per = irr_periodique_bissection(cash_flows, freq=freq)
 
-            st.info(f"**TAEG (approx.) : {taeg_str} %** (incluant les frais initiaux saisis).")
+        if irr_per is not None:
+            taeg = (1 + irr_per) ** freq - 1
+
+            st.info(
+                f"**TAEG de votre financement (approx.) : {format_pct_fr(taeg, 2)}** "
+                f"(incluant les frais initiaux saisis)."
+            )
 
             st.markdown(
                 """
                 ### ℹ️ TAEG : c’est quoi et à quoi ça sert ?
 
-                **TAEG** = *Taux Annuel Effectif Global*.
+                **TAEG** (*Taux Annuel Effectif Global*) = **coût total et réel de votre crédit**,
+                exprimé en **taux annuel**.
 
-                - C’est le **coût total et réel de votre crédit**, exprimé en **taux annuel**.
-                - Il inclut :
-                  - le **taux d’intérêt nominal**,
-                  - les **frais de dossier**,
-                  - les **frais d’assurance obligatoires**,
-                  - les **frais de garantie** (hypothèque, caution…),
-                  - et tous les frais **obligatoires** pour obtenir le prêt.
+                Il inclut :
+                - le **taux d’intérêt nominal**,
+                - les **frais de dossier**,
+                - les **frais d’assurance obligatoires**,
+                - les **frais de garantie** (hypothèque, caution…),
+                - et tous les frais **obligatoires** pour obtenir le prêt.
 
                 👉 Le TAEG sert à :
                 - **Comparer plusieurs offres de crédit entre elles** :  
-                  une banque peut afficher un taux nominal bas mais un TAEG plus élevé à cause des frais.
-                - Donner une **vision standardisée et transparente** du coût de votre financement :  
+                  une offre peut avoir un taux nominal attractif mais un TAEG plus élevé à cause des frais.
+                - Avoir une **vision standardisée et transparente** du coût de votre financement :  
                   la publication du TAEG est **obligatoire** pour les établissements prêteurs.
 
-                > En résumé : le TAEG vous indique **combien votre financement vous coûte vraiment**, par an,
+                > En résumé : le TAEG vous indique **combien votre financement vous coûte vraiment par an**,  
                 > une fois tous les frais intégrés.
                 """
+            )
+        else:
+            st.warning(
+                "Impossible de calculer un TAEG cohérent à partir des flux (vérifiez les paramètres du prêt)."
             )
 
         # ===== Graphique 1 : Capital restant dû =====
