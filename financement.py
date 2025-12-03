@@ -22,15 +22,6 @@ def format_eur(n: float, decimals: int = 2) -> str:
     return fmt.replace(",", " ").replace(".", ",")
 
 
-def format_pct_fr(x: float, decimals: int = 2) -> str:
-    """
-    Format pour les pourcentages style FR : 4,25 %
-    x est en décimal (0.0425 -> 4,25 %)
-    """
-    s = f"{x * 100:.{decimals}f}".replace(".", ",")
-    return s + " %"
-
-
 # ---------- Page Streamlit ----------
 
 def render():
@@ -69,32 +60,16 @@ def render():
         "Fréquence des paiements",
         [12, 4, 1],
         index=0,
-        format_func=lambda x: {
-            12: "Mensuel (12)",
-            4: "Trimestriel (4)",
-            1: "Annuel (1)",
-        }[x],
+        format_func=lambda x: {12: "Mensuel (12)", 4: "Trimestriel (4)", 1: "Annuel (1)"}[x],
     )
 
-    type_remb_humain = st.selectbox(
-        "Type de remboursement",
-        ["Annuité constante", "Amortissement constant", "Bullet"],
-        index=0,
-    )
-
-    mapping_type = {
-        "Annuité constante": "annuite",
-        "Amortissement constant": "amortissement_constant",
-        "Bullet": "bullet",
-    }
-    type_remb_tech = mapping_type[type_remb_humain]
-
+    # 🔹 Nouveau : frais initiaux pour le TAEG
     frais_initiaux = st.number_input(
-        "Frais initiaux (optionnel, en €)",
+        "Frais initiaux (en €)",
         min_value=0.0,
         value=0.0,
         step=100.0,
-        help="Frais prélevés au début du prêt (frais de dossier, assurance, etc.). "
+        help="Frais payés au début du prêt (frais de dossier, assurance, etc.). "
              "Utilisés pour le calcul du TAEG.",
     )
 
@@ -109,22 +84,15 @@ def render():
             date_debut=date_debut,
             duree_annees=int(duree),
             paiements_par_an=int(freq),
-            type_remboursement=type_remb_tech,
         )
 
-        # Paiement de la 1ère période
-        premiere_echeance = df["Mensualité (€)"].iloc[0]
-        label_echeance = {
-            "annuite": "Annuité constante (1ère échéance)",
-            "amortissement_constant": "1ère échéance (amortissement constant)",
-            "bullet": "Paiement de la 1ère période (prêt bullet)",
-        }[type_remb_tech]
-
+        # Annuité constante (1ère mensualité)
+        annuite = df["Mensualité (€)"].iloc[0]
         st.markdown(
             f"""
             <div style="margin-top:0.5rem; margin-bottom:0.8rem;
                         font-size:1.1rem; font-weight:700; color:white;">
-                {label_echeance} : {format_eur(premiere_echeance)} €
+                Annuité constante : {format_eur(annuite)} €
             </div>
             """,
             unsafe_allow_html=True,
@@ -132,51 +100,44 @@ def render():
 
         cout_interets_total = df["Intérêts (€)"].sum()
         st.success(
-            f"Tableau d'amortissement généré pour un prêt de "
-            f"**{format_eur(capital, 0)} €** — type : **{type_remb_humain}** "
+            f"Tableau d'amortissement généré pour un prêt de **{format_eur(capital, 0)} €** "
             f"— coût total des intérêts : **{format_eur(cout_interets_total)} €** 💶"
         )
 
-        # ===== TAEG (approximation par IRR) =====
-        # Flux : +capital - frais au départ, puis échéances négatives
+        # 🔹 🔹 TAEG (approximation par IRR) 🔹 🔹
         cash_flows = [capital - frais_initiaux] + [-x for x in df["Mensualité (€)"]]
         try:
             irr_periodique = np.irr(cash_flows)
         except Exception:
-            irr_periodique = np.nan
+            irr_periodique = None
 
         if irr_periodique is not None and not np.isnan(irr_periodique):
             taeg = (1 + irr_periodique) ** freq - 1
+            taeg_str = f"{taeg * 100:.2f}".replace(".", ",")
 
-            # Ligne principale : valeur du TAEG
-            st.info(
-                f"**TAEG (approx.) : {format_pct_fr(taeg, 2)}** "
-                f"(incluant les frais initiaux saisis)."
-            )
+            st.info(f"**TAEG (approx.) : {taeg_str} %** (incluant les frais initiaux saisis).")
 
-            # Bloc explicatif : c'est quoi / à quoi ça sert
             st.markdown(
                 """
                 ### ℹ️ TAEG : c’est quoi et à quoi ça sert ?
 
                 **TAEG** = *Taux Annuel Effectif Global*.
 
-                - C’est le **coût total et réel du crédit**, exprimé en **taux annuel**.
+                - C’est le **coût total et réel de votre crédit**, exprimé en **taux annuel**.
                 - Il inclut :
                   - le **taux d’intérêt nominal**,
                   - les **frais de dossier**,
-                  - les **frais d’assurance obligatoire**,
+                  - les **frais d’assurance obligatoires**,
                   - les **frais de garantie** (hypothèque, caution…),
                   - et tous les frais **obligatoires** pour obtenir le prêt.
 
-                👉 Le TAEG sert principalement à :
-                - **Comparer plusieurs offres de crédit** entre elles :  
-                  même si une banque affiche un taux nominal plus bas, son TAEG peut être plus élevé
-                  si elle facture plus de frais.
-                - Donner une **vision standardisée et transparente** du coût d’un crédit :  
+                👉 Le TAEG sert à :
+                - **Comparer plusieurs offres de crédit entre elles** :  
+                  une banque peut afficher un taux nominal bas mais un TAEG plus élevé à cause des frais.
+                - Donner une **vision standardisée et transparente** du coût de votre financement :  
                   la publication du TAEG est **obligatoire** pour les établissements prêteurs.
 
-                > En résumé : le TAEG te dit **combien ton crédit te coûte vraiment**, par an,  
+                > En résumé : le TAEG vous indique **combien votre financement vous coûte vraiment**, par an,
                 > une fois tous les frais intégrés.
                 """
             )
@@ -212,7 +173,7 @@ def render():
         )
         fig_cf.update_layout(
             barmode="stack",
-            title="Décomposition de l'échéance : Intérêts vs Amortissement",
+            title="Décomposition de l'annuité : Intérêts vs Amortissement",
             xaxis_title="Période",
             yaxis_title="Montant par période (€)",
             legend_title="Composantes",
@@ -221,6 +182,7 @@ def render():
 
         # ===== Tableau formaté (FR) =====
         df_formatted = df.copy()
+
         for col in [
             "Mensualité (€)",
             "Intérêts (€)",
@@ -276,7 +238,6 @@ def render():
                     date_debut=date_debut,
                     duree_annees=int(duree),
                     paiements_par_an=int(freq),
-                    type_remboursement=type_remb_tech,
                 )
 
                 fig_comp.add_trace(
@@ -289,20 +250,17 @@ def render():
                 )
 
                 cout_int = df_t["Intérêts (€)"].sum()
-                premiere_ech_t = df_t["Mensualité (€)"].iloc[0]
+                annuite_t = df_t["Mensualité (€)"].iloc[0]
                 resume.append(
                     {
                         "Taux (%)": f"{t_pct:.2f}",
-                        "Première échéance (€)": format_eur(premiere_ech_t),
+                        "Annuité (€)": format_eur(annuite_t),
                         "Coût total intérêts (€)": format_eur(cout_int),
                     }
                 )
 
             fig_comp.update_layout(
-                title=(
-                    "Comparaison des capitaux restants dus "
-                    "selon différents taux (même type de remboursement)"
-                ),
+                title="Comparaison des capitaux restants dus selon différents taux",
                 xaxis_title="Période",
                 yaxis_title="Capital restant dû (€)",
                 legend_title="Taux",

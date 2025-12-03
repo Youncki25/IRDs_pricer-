@@ -9,41 +9,28 @@ def tableau_amortissement_emprunt(
     date_debut: date,
     duree_annees: int,
     paiements_par_an: int = 12,
-    type_remboursement: str = "annuite",
 ):
     """
-    Génère un tableau d'amortissement pour un emprunt bancaire.
+    Génère un tableau d'amortissement pour un emprunt bancaire à annuités constantes.
 
-    type_remboursement :
-        - "annuite"                : annuités constantes
-        - "amortissement_constant" : amortissement du capital constant
-        - "bullet"                 : intérêts périodiques, capital remboursé à la fin
+    capital_initial : montant emprunté (ex : 1_000_000)
+    taux_annuel     : ex : 0.04 pour 4%
+    date_debut      : date de début du prêt (date du 1er jour de la 1ère période)
+    duree_annees    : durée totale du crédit, en années
+    paiements_par_an: 12 pour mensualités, 4 pour trimestrielles, 1 pour annuelles
     """
-
-    type_remboursement = type_remboursement.lower()
-    if type_remboursement not in {"annuite", "amortissement_constant", "bullet"}:
-        raise ValueError("type_remboursement doit être 'annuite', "
-                         "'amortissement_constant' ou 'bullet'")
 
     taux_periodique = taux_annuel / paiements_par_an
     nb_paiements = duree_annees * paiements_par_an
 
+    # Annuité constante
+    mensualite = capital_initial * taux_periodique / (
+        1 - (1 + taux_periodique) ** (-nb_paiements)
+    )
+
     data = []
     capital_restant = capital_initial
     date_debut_periode = date_debut
-
-    # --- Pré-calculs selon le type ---
-    if type_remboursement == "annuite":
-        # Annuité constante
-        mensualite_constante = capital_initial * taux_periodique / (
-            1 - (1 + taux_periodique) ** (-nb_paiements)
-        )
-    elif type_remboursement == "amortissement_constant":
-        amortissement_const = capital_initial / nb_paiements
-    else:
-        # bullet : pas de pré-calcul particulier
-        mensualite_constante = None
-        amortissement_const = None
 
     for periode in range(1, nb_paiements + 1):
         # Fin de période = début + 1/paiements_par_an an
@@ -51,26 +38,9 @@ def tableau_amortissement_emprunt(
             months=12 // paiements_par_an
         )
 
-        if type_remboursement == "annuite":
-            mensualite = mensualite_constante
-            interets = capital_restant * taux_periodique
-            amort = mensualite - interets
-
-        elif type_remboursement == "amortissement_constant":
-            interets = capital_restant * taux_periodique
-            amort = amortissement_const
-            mensualite = interets + amort
-
-        else:  # bullet
-            interets = capital_restant * taux_periodique
-            if periode < nb_paiements:
-                amort = 0.0
-                mensualite = interets
-            else:
-                amort = capital_restant
-                mensualite = interets + amort
-
-        capital_restant = max(capital_restant - amort, 0.0)
+        interets = capital_restant * taux_periodique
+        amort = mensualite - interets
+        capital_restant = max(capital_restant - amort, 0)
 
         data.append(
             {
