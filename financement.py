@@ -147,9 +147,38 @@ def render():
 
         if irr_periodique is not None and not np.isnan(irr_periodique):
             taeg = (1 + irr_periodique) ** freq - 1
+
+            # Ligne principale : valeur du TAEG
             st.info(
-                f"TAEG (approx.) : **{format_pct_fr(taeg, 2)}** "
+                f"**TAEG (approx.) : {format_pct_fr(taeg, 2)}** "
                 f"(incluant les frais initiaux saisis)."
+            )
+
+            # Bloc explicatif : c'est quoi / à quoi ça sert
+            st.markdown(
+                """
+                ### ℹ️ TAEG : c’est quoi et à quoi ça sert ?
+
+                **TAEG** = *Taux Annuel Effectif Global*.
+
+                - C’est le **coût total et réel du crédit**, exprimé en **taux annuel**.
+                - Il inclut :
+                  - le **taux d’intérêt nominal**,
+                  - les **frais de dossier**,
+                  - les **frais d’assurance obligatoire**,
+                  - les **frais de garantie** (hypothèque, caution…),
+                  - et tous les frais **obligatoires** pour obtenir le prêt.
+
+                👉 Le TAEG sert principalement à :
+                - **Comparer plusieurs offres de crédit** entre elles :  
+                  même si une banque affiche un taux nominal plus bas, son TAEG peut être plus élevé
+                  si elle facture plus de frais.
+                - Donner une **vision standardisée et transparente** du coût d’un crédit :  
+                  la publication du TAEG est **obligatoire** pour les établissements prêteurs.
+
+                > En résumé : le TAEG te dit **combien ton crédit te coûte vraiment**, par an,  
+                > une fois tous les frais intégrés.
+                """
             )
 
         # ===== Graphique 1 : Capital restant dû =====
