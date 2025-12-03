@@ -1,5 +1,6 @@
 import streamlit as st
 from datetime import date
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -19,6 +20,15 @@ def format_eur(n: float, decimals: int = 2) -> str:
     """
     fmt = f"{{:,.{decimals}f}}".format(n)
     return fmt.replace(",", " ").replace(".", ",")
+
+
+def format_pct_fr(x: float, decimals: int = 2) -> str:
+    """
+    Format pour les pourcentages style FR : 4,25 %
+    x est en décimal (0.0425 -> 4,25 %)
+    """
+    s = f"{x * 100:.{decimals}f}".replace(".", ",")
+    return s + " %"
 
 
 # ---------- Page Streamlit ----------
@@ -59,9 +69,33 @@ def render():
         "Fréquence des paiements",
         [12, 4, 1],
         index=0,
-        format_func=lambda x: {12: "Mensuel (12)", 4: "Trimestriel (4)", 1: "Annuel (1)"}[
-            x
-        ],
+        format_func=lambda x: {
+            12: "Mensuel (12)",
+            4: "Trimestriel (4)",
+            1: "Annuel (1)",
+        }[x],
+    )
+
+    type_remb_humain = st.selectbox(
+        "Type de remboursement",
+        ["Annuité constante", "Amortissement constant", "Bullet"],
+        index=0,
+    )
+
+    mapping_type = {
+        "Annuité constante": "annuite",
+        "Amortissement constant": "amortissement_constant",
+        "Bullet": "bullet",
+    }
+    type_remb_tech = mapping_type[type_remb_humain]
+
+    frais_initiaux = st.number_input(
+        "Frais initiaux (optionnel, en €)",
+        min_value=0.0,
+        value=0.0,
+        step=100.0,
+        help="Frais prélevés au début du prêt (frais de dossier, assurance, etc.). "
+             "Utilisés pour le calcul du TAEG.",
     )
 
     # ---- Calcul / affichage du cas principal ----
@@ -75,15 +109,22 @@ def render():
             date_debut=date_debut,
             duree_annees=int(duree),
             paiements_par_an=int(freq),
+            type_remboursement=type_remb_tech,
         )
 
-        # Annuité constante (1ère mensualité)
-        annuite = df["Mensualité (€)"].iloc[0]
+        # Paiement de la 1ère période
+        premiere_echeance = df["Mensualité (€)"].iloc[0]
+        label_echeance = {
+            "annuite": "Annuité constante (1ère échéance)",
+            "amortissement_constant": "1ère échéance (amortissement constant)",
+            "bullet": "Paiement de la 1ère période (prêt bullet)",
+        }[type_remb_tech]
+
         st.markdown(
             f"""
             <div style="margin-top:0.5rem; margin-bottom:0.8rem;
                         font-size:1.1rem; font-weight:700; color:white;">
-                Annuité constante : {format_eur(annuite)} €
+                {label_echeance} : {format_eur(premiere_echeance)} €
             </div>
             """,
             unsafe_allow_html=True,
@@ -91,9 +132,25 @@ def render():
 
         cout_interets_total = df["Intérêts (€)"].sum()
         st.success(
-            f"Tableau d'amortissement généré pour un prêt de **{format_eur(capital, 0)} €** "
+            f"Tableau d'amortissement généré pour un prêt de "
+            f"**{format_eur(capital, 0)} €** — type : **{type_remb_humain}** "
             f"— coût total des intérêts : **{format_eur(cout_interets_total)} €** 💶"
         )
+
+        # ===== TAEG (approximation par IRR) =====
+        # Flux : +capital - frais au départ, puis échéances négatives
+        cash_flows = [capital - frais_initiaux] + [-x for x in df["Mensualité (€)"]]
+        try:
+            irr_periodique = np.irr(cash_flows)
+        except Exception:
+            irr_periodique = np.nan
+
+        if irr_periodique is not None and not np.isnan(irr_periodique):
+            taeg = (1 + irr_periodique) ** freq - 1
+            st.info(
+                f"TAEG (approx.) : **{format_pct_fr(taeg, 2)}** "
+                f"(incluant les frais initiaux saisis)."
+            )
 
         # ===== Graphique 1 : Capital restant dû =====
         fig_crd = px.line(
@@ -126,7 +183,7 @@ def render():
         )
         fig_cf.update_layout(
             barmode="stack",
-            title="Décomposition de l'annuité : Intérêts vs Amortissement",
+            title="Décomposition de l'échéance : Intérêts vs Amortissement",
             xaxis_title="Période",
             yaxis_title="Montant par période (€)",
             legend_title="Composantes",
@@ -135,7 +192,6 @@ def render():
 
         # ===== Tableau formaté (FR) =====
         df_formatted = df.copy()
-
         for col in [
             "Mensualité (€)",
             "Intérêts (€)",
@@ -191,6 +247,7 @@ def render():
                     date_debut=date_debut,
                     duree_annees=int(duree),
                     paiements_par_an=int(freq),
+                    type_remboursement=type_remb_tech,
                 )
 
                 fig_comp.add_trace(
@@ -203,17 +260,20 @@ def render():
                 )
 
                 cout_int = df_t["Intérêts (€)"].sum()
-                annuite_t = df_t["Mensualité (€)"].iloc[0]
+                premiere_ech_t = df_t["Mensualité (€)"].iloc[0]
                 resume.append(
                     {
                         "Taux (%)": f"{t_pct:.2f}",
-                        "Annuité (€)": format_eur(annuite_t),
+                        "Première échéance (€)": format_eur(premiere_ech_t),
                         "Coût total intérêts (€)": format_eur(cout_int),
                     }
                 )
 
             fig_comp.update_layout(
-                title="Comparaison des capitaux restants dus selon différents taux",
+                title=(
+                    "Comparaison des capitaux restants dus "
+                    "selon différents taux (même type de remboursement)"
+                ),
                 xaxis_title="Période",
                 yaxis_title="Capital restant dû (€)",
                 legend_title="Taux",
