@@ -2,11 +2,9 @@ streamlit
 pandas
 numpy
 matplotlib
-reportlab
+fpdf2
 fredapi
 requests
 plotly
 python-dateutil
-ecb-data
 openpyxl
-financement
