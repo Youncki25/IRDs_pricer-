@@ -237,6 +237,8 @@ def render():
             horizontal=True,
         )
 
+        indice_variable = None
+
         if type_taux == "Taux fixe":
             taux_annuel = st.number_input(
                 "Taux nominal annuel (%)",
@@ -250,7 +252,13 @@ def render():
                 value=4.00,
                 step=0.10,
                 format="%.2f",
-                help="Pour l'instant un seul taux est utilisé pour tout l'échéancier (exemple simple).",
+                help="Taux utilisé comme base, l'indice choisi sert de référence (EURIBOR, €STR, etc.).",
+            )
+            indice_variable = st.selectbox(
+                "Indice de référence (taux variable)",
+                ["EURIBOR 1M", "EURIBOR 3M", "EURIBOR 6M", "€STR", "SOFR", "SONIA"],
+                index=1,
+                help="Choisis l'indice de référence pour le taux variable.",
             )
 
         frais_dossier = st.number_input(
@@ -300,6 +308,9 @@ def render():
                 date_fin=date_fin,
                 periodicite=periodicite,
             )
+            # On ajoute l'indice choisi dans une colonne info
+            if indice_variable is not None:
+                df["Indice de référence"] = indice_variable
 
         if df.empty:
             st.warning("Aucune échéance générée : vérifie la période et la périodicité.")
@@ -333,7 +344,7 @@ def render():
         with col2:
             st.metric(
                 "Annuité (moyenne)",
-                value=f"**{format_eur(annuite_moy, decimals=2)}**",
+                value=format_eur(annuite_moy, decimals=2),
             )
 
         with col3:
@@ -353,6 +364,9 @@ def render():
         df_aff["Capital restant dû"] = df_aff["Capital restant dû"].apply(
             lambda x: format_eur(x, 0)
         )
+        if "Indice de référence" in df_aff.columns:
+            # on la laisse telle quelle (texte)
+            pass
         df_aff["Assurance"] = df_aff["Assurance"].apply(lambda x: format_eur(x, 2))
         df_aff["Flux total (sortie)"] = df_aff["Flux total (sortie)"].apply(
             lambda x: format_eur(x, 2)
@@ -363,7 +377,6 @@ def render():
         # ------------------ Calcul du TAEG ------------------ #
 
         # Flux init : décaissement net pour l'emprunteur = +capital - frais
-        # (attention signe : on se place du point de vue de l'emprunteur)
         cashflows = []
 
         d0 = date_debut

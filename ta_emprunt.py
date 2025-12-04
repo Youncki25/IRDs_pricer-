@@ -1,123 +1,78 @@
 import pandas as pd
 from datetime import date
-from dateutil.relativedelta import relativedelta
+
+def _periodicite_to_freq(periodicite: str):
+    """
+    Traduit la périodicité (texte) en :
+    - code de fréquence pandas
+    - nombre de périodes par an
+    """
+    if periodicite == "Mensuelle":
+        return "MS", 12
+    if periodicite == "Trimestrielle":
+        return "QS", 4
+    return "YS", 1  # Annuelle
 
 
 def tableau_amortissement_emprunt(
-    capital_initial: float,
-    taux_annuel: float,
+    capital: float,
     date_debut: date,
-    duree_annees: int,
-    paiements_par_an: int = 12,
-):
+    date_fin: date,
+    periodicite: str = "Mensuelle",
+    type_taux: str = "Fixe",   # "Fixe" ou "Variable"
+    taux_annuel: float = 4.0,  # taux nominal ou marge sur indice
+    indice_ref: str | None = None,
+) -> pd.DataFrame:
     """
-    Emprunt à annuités constantes, taux FIXE.
+    Génère un échéancier simple entre date_debut et date_fin.
+
+    - type_taux = "Fixe" :
+        -> on applique un taux nominal fixe = taux_annuel (%)
+    - type_taux = "Variable" :
+        -> on applique un taux = indice_ref (théorique) + marge (taux_annuel)
+           (ici on ne met pas de vraie courbe, juste un placeholder constant).
+
+    indice_ref doit être dans :
+        ["EURIBOR 1M", "EURIBOR 3M", "EURIBOR 6M", "€STR", "SOFR", "SONIA"]
     """
-    taux_periodique = taux_annuel / paiements_par_an
-    nb_paiements = duree_annees * paiements_par_an
 
-    mensualite = capital_initial * taux_periodique / (
-        1 - (1 + taux_periodique) ** (-nb_paiements)
-    )
+    freq, n_par_an = _periodicite_to_freq(periodicite)
 
-    data = []
-    capital_restant = capital_initial
-    date_debut_periode = date_debut
+    dates = pd.date_range(start=date_debut, end=date_fin, freq=freq)
+    if len(dates) == 0:
+        return pd.DataFrame()
 
-    for periode in range(1, nb_paiements + 1):
-        date_fin_periode = date_debut_periode + relativedelta(
-            months=12 // paiements_par_an
-        )
+    n = len(dates)
 
-        interets = capital_restant * taux_periodique
-        amort = mensualite - interets
-        capital_restant = max(capital_restant - amort, 0.0)
+    # Pour l'instant, on considère un taux effectif constant par période :
+    # - si Fixe : taux_nominal = taux_annuel
+    # - si Variable : on pourrait faire (indice + marge), ici on note seulement l'indice.
+    taux_par_periode = taux_annuel / 100 / n_par_an
 
-        data.append(
-            {
-                "Période": periode,
-                "Début période": date_debut_periode,
-                "Fin période": date_fin_periode,
-                "Mensualité (€)": mensualite,
-                "Intérêts (€)": interets,
-                "Amortissement (€)": amort,
-                "Capital restant dû (€)": capital_restant,
-            }
-        )
+    # Emprunt amortissable à annuités constantes (pour les 2 cas)
+    annuite = capital * taux_par_periode / (1 - (1 + taux_par_periode) ** (-n))
 
-        date_debut_periode = date_fin_periode
+    crd = capital
+    lignes = []
 
-    return pd.DataFrame(data)
+    for dt_ech in dates:
+        interets = crd * taux_par_periode
+        amort = annuite - interets
+        crd = crd - amort
 
+        ligne = {
+            "Date échéance": dt_ech.date(),
+            "Annuité": annuite,
+            "Intérêts": interets,
+            "Amortissement": amort,
+            "Capital restant dû": max(crd, 0),
+            "Type de taux": type_taux,
+        }
 
-def tableau_amortissement_emprunt_variable(
-    capital_initial: float,
-    liste_taux_annuels: list[float],
-    date_debut: date,
-    duree_annees: int,
-    paiements_par_an: int = 12,
-):
-    """
-    Emprunt à annuités recalculées chaque année (taux VARIABLE).
+        if type_taux == "Variable" and indice_ref is not None:
+            ligne["Indice de référence"] = indice_ref
 
-    - liste_taux_annuels : liste de taux annuels (en décimal, ex 0.03 pour 3%)
-      année 1 -> taux[0], année 2 -> taux[1], etc.
-      Si la liste est plus courte que la durée, on répète le dernier taux.
-    """
-    nb_paiements_total = duree_annees * paiements_par_an
+        lignes.append(ligne)
 
-    # Ajuste la liste des taux à la durée du prêt
-    if len(liste_taux_annuels) < duree_annees:
-        last = liste_taux_annuels[-1]
-        liste_taux_annuels = liste_taux_annuels + [last] * (
-            duree_annees - len(liste_taux_annuels)
-        )
-    elif len(liste_taux_annuels) > duree_annees:
-        liste_taux_annuels = liste_taux_annuels[:duree_annees]
-
-    data = []
-    capital_restant = capital_initial
-    date_debut_periode = date_debut
-    periode_global = 0
-
-    for annee in range(duree_annees):
-        taux_annuel = liste_taux_annuels[annee]
-        taux_periodique = taux_annuel / paiements_par_an
-
-        periodes_restantes = nb_paiements_total - periode_global
-        if periodes_restantes <= 0:
-            break
-
-        # Annuité recalculée au début de chaque année
-        mensualite_annee = capital_restant * taux_periodique / (
-            1 - (1 + taux_periodique) ** (-periodes_restantes)
-        )
-
-        for _ in range(paiements_par_an):
-            if periode_global >= nb_paiements_total:
-                break
-
-            periode_global += 1
-            date_fin_periode = date_debut_periode + relativedelta(
-                months=12 // paiements_par_an
-            )
-
-            interets = capital_restant * taux_periodique
-            amort = mensualite_annee - interets
-            capital_restant = max(capital_restant - amort, 0.0)
-
-            data.append(
-                {
-                    "Période": periode_global,
-                    "Début période": date_debut_periode,
-                    "Fin période": date_fin_periode,
-                    "Mensualité (€)": mensualite_annee,
-                    "Intérêts (€)": interets,
-                    "Amortissement (€)": amort,
-                    "Capital restant dû (€)": capital_restant,
-                }
-            )
-
-            date_debut_periode = date_fin_periode
-
-    return pd.DataFrame(data)
+    df = pd.DataFrame(lignes)
+    return df
