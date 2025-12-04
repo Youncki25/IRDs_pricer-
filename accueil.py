@@ -96,7 +96,7 @@ def render():
 
     st.markdown(
         """
-        Cette application a été développée pour **explorer la tarification et la gestion des risques
+        Cette application a été développée pour **explorer le pricing et la gestion des risques
         sur les produits de taux** (IRS, IRDs, obligations à taux fixe) en s’appuyant sur Python,
         QuantLib et des **données de marché gratuites ou quasi temps réel**.
 

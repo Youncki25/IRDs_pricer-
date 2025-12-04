@@ -16,10 +16,14 @@ def render():
     st.markdown(
         """
         Cette application explore :
-        - la tarification de swaps (IRS), IRDs, obligations  
+        - le pricing de swaps (IRS), IRDs, obligations  
         - la construction de courbes (OIS, swaps, STIRs)  
         - l’analyse des marchés via plusieurs API (FRED, ECB, Alpha Vantage, Quandl…)  
         - la reproduction de courbes *trading-floor-like*  
+        - outil basique de financement avec tableau d'amortissement
+        - la visualisation de données macroéconomiques et financières
+        - la création de graphiques financiers interactifs
+        
         """
     )
 
