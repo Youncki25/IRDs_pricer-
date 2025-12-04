@@ -8,3 +8,4 @@ requests
 plotly
 python-dateutil
 openpyxl
+reportlab
