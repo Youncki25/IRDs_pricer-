@@ -11,3 +11,8 @@ openpyxl
 reportlab
 pandas-datareader
 QuantLib
+yfinance
+scipy
+statsmodels
+tabulate
+xlrd
