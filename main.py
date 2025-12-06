@@ -7,7 +7,9 @@ import accueil
 import pricer
 import graphique
 import obligations
-import financement   # 👈 NEW
+import financement
+import dashboard_macro   
+
 
 #streamlit run c:/Users/youne/https-github.com-Youncki25-credit-rating-app/IRDs_pricer-/main.py
 # --------------------- App config & sidebar ---------------------
@@ -20,19 +22,15 @@ page = U.sidebar()
 # Bandeau SOFR en haut (comme avant)
 U.show_sofr_banner("SOFR")
 
-# =============================== ROUTEUR ===============================
 if page == "Accueil":
     accueil.render()
-
+elif page == "Dashboard Macroéconomique":
+    dashboard_macro.render()   # 👈 AJOUT
 elif page == "Pricer":
     pricer.render()
-
 elif page == "Graphique":
     graphique.render()
-
 elif page == "Obligations":
     obligations.render()
-
 elif page == "Tableau amortissement pour financement":
     financement.render()
-

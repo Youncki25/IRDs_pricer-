@@ -9,3 +9,4 @@ plotly
 python-dateutil
 openpyxl
 reportlab
+pandas-datareader
