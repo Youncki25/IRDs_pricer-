@@ -22,7 +22,6 @@ FLAGS = {
 
 def render():
     st.title("💱 FX Trading – Data ECB")
-    st.write("Données FX spot issues de l’API ECB (fixing quotidien 16h CET).")
 
     currencies = list(FLAGS.keys())
     rows = []
@@ -32,7 +31,6 @@ def render():
         try:
             date, eur_ccy = get_eur_cross(ccy)
             ccy_eur = 1 / eur_ccy
-
             last_update = date
 
             rows.append({
@@ -50,19 +48,9 @@ def render():
 
     df = pd.DataFrame(rows)
 
-    # --- Date de valeur / value date ---
+    # --- Date de calcul (value date) ---
     if last_update:
-        st.markdown(
-            f"📅 **Date de valeur (ECB Spot FX) : `{last_update}`**  \n"
-            f"ℹ️ Données FX fixées à **16h CET**, publiées avec un **décalage d’environ 1 jour**."
-        )
+        st.markdown(f"📅 **Date de calcul des données : `{last_update}`**")
 
     st.subheader("📊 Taux spot ECB – Cross EUR/CCY")
     st.dataframe(df, use_container_width=True)
-    st.markdown(
-        """
-        ---
-        *Données fournies par la [Banque Centrale Européenne (ECB)](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html).*
-        """
-    )
-    
