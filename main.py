@@ -1,4 +1,5 @@
 import streamlit as st
+import fx_trading
 import ui as U
 
 from config import APP_TITLE, APP_LAYOUT
@@ -24,8 +25,10 @@ U.show_sofr_banner("SOFR")
 
 if page == "Accueil":
     accueil.render()
+elif page == "FX Trading":
+    fx_trading.render()   
 elif page == "Dashboard Macroéconomique":
-    dashboard_macro.render()   # 👈 AJOUT
+    dashboard_macro.render()   
 elif page == "Pricer":
     pricer.render()
 elif page == "Graphique":
