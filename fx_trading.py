@@ -54,3 +54,4 @@ def render():
 
     st.subheader("📊 Taux spot ECB – EUR/CCY")
     st.dataframe(df, use_container_width=True)
+    

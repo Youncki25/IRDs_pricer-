@@ -2,17 +2,20 @@ import requests
 
 BASE_URL = "https://data-api.ecb.europa.eu/service/data/EXR"
 
-def get_eur_cross(quote_ccy: str, freq: str = "D"):
-    """
-    Récupère 1 EUR = ? quote_ccy
-    (ex: quote_ccy='USD' -> 1 EUR = x USD)
 
-    freq: 'D' = daily, 'M' = monthly, etc.
+def get_eur_cross(ccy: str, freq: str = "D"):
     """
-    quote_ccy = quote_ccy.upper()
+    Retourne :
+      - la date de calcul (value date)
+      - le taux spot EUR/CCY
 
-    # Série ECB : FREQ.CCY.EUR.SP00.A
-    key = f"{freq}.{quote_ccy}.EUR.SP00.A"
+    Exemple : get_eur_cross("USD") -> ("2025-12-10", 1.1714)
+    """
+
+    ccy = ccy.upper()
+
+    # Clé SDMX : FREQ.CCY.EUR.SP00.A
+    key = f"{freq}.{ccy}.EUR.SP00.A"
     url = f"{BASE_URL}/{key}"
 
     params = {
@@ -21,54 +24,24 @@ def get_eur_cross(quote_ccy: str, freq: str = "D"):
         "format": "jsondata",
     }
 
-    resp = requests.get(url, params=params)
-    print(f"[{quote_ccy}] Status code:", resp.status_code)
-    print(f"[{quote_ccy}] URL appelée:", resp.url)
-    resp.raise_for_status()
+    r = requests.get(url, params=params)
+    r.raise_for_status()
 
-    data = resp.json()
+    data = r.json()
 
-    # --- Parsing SDMX-JSON (même logique qu’avant) ---
+    # ---- Parsing SDMX JSON ----
     series = data["dataSets"][0]["series"]["0:0:0:0:0"]
     observations = series["observations"]
 
-    last_date = sorted(observations.keys())[-1]
-    eur_quote = observations[last_date][0]  # 1 EUR = eur_quote (CCY)
+    # On récupère l’index de la dernière observation (ex: "0")
+    idx_str = sorted(observations.keys())[-1]
+    idx = int(idx_str)
 
-    return last_date, eur_quote
+    # La vraie date est dans la dimension d'observation
+    date_values = data["structure"]["dimensions"]["observation"][0]["values"]
+    date_str = date_values[idx]["id"]     # ex: "2025-12-10"
 
+    # Valeur du spot EUR/CCY
+    eur_ccy = observations[idx_str][0]
 
-if __name__ == "__main__":
-
-    # Liste des devises qu’on veut
-    currencies = [
-        "USD", "GBP", "JPY", "CHF",
-        "AUD", "CAD",
-        "SEK", "NOK", "DKK",
-        "PLN", "CZK", "HUF",
-        "CNY",
-    ]
-
-    results = {}
-
-    for ccy in currencies:
-        try:
-            date, eur_ccy = get_eur_cross(ccy)
-            ccy_eur = 1 / eur_ccy
-
-            results[ccy] = {
-                "date": date,
-                "EUR/CCY": eur_ccy,
-                "CCY/EUR": ccy_eur,
-            }
-
-            print("-" * 40)
-            print(f"Date       : {date}")
-            print(f"EUR/{ccy}  : {eur_ccy}")
-            print(f"{ccy}/EUR  : {ccy_eur}")
-
-        except Exception as e:
-            print(f"⚠️ Erreur pour {ccy} : {e}")
-
-    print("\n=== Récap (dictionnaire utilisable dans ton pricer) ===")
-    print(results)
+    return date_str, eur_ccy
