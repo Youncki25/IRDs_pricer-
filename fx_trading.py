@@ -1,36 +1,62 @@
 import streamlit as st
 from change import get_eur_cross
 
+import streamlit as st
+from change import get_eur_cross
+from emoji_country_flag import flag
+import pandas as pd
+
+FLAGS = {
+    "USD": flag("US"),
+    "GBP": flag("GB"),
+    "JPY": flag("JP"),
+    "CHF": flag("CH"),
+    "AUD": flag("AU"),
+    "CAD": flag("CA"),
+    "SEK": flag("SE"),
+    "NOK": flag("NO"),
+    "DKK": flag("DK"),
+    "PLN": flag("PL"),
+    "CZK": flag("CZ"),
+    "HUF": flag("HU"),
+    "CNY": flag("CN"),
+}
+
 def render():
+
     st.title("💱 FX Trading – Data ECB")
+    st.write("Données spot FX issues directement de l’API ECB (1 EUR = X CCY).")
 
-    st.write("Données spot FX issues directement de l'API ECB (1 EUR = X CCY).")
+    currencies = list(FLAGS.keys())
 
-    currencies = [
-        "USD", "GBP", "JPY", "CHF",
-        "AUD", "CAD",
-        "SEK", "NOK", "DKK",
-        "PLN", "CZK", "HUF",
-        "CNY",
-    ]
-
-    results = {}
+    rows = []
 
     for ccy in currencies:
         try:
             date, eur_ccy = get_eur_cross(ccy)
             ccy_eur = 1 / eur_ccy
 
-            results[ccy] = {
+            rows.append({
+                "Devise": f"{FLAGS[ccy]} {ccy}",
                 "EUR/CCY": eur_ccy,
                 "CCY/EUR": ccy_eur,
-                "date": date
-            }
+                "Date": date
+            })
 
         except Exception as e:
-            results[ccy] = {"error": str(e)}
+            rows.append({
+                "Devise": f"{FLAGS[ccy]} {ccy}",
+                "EUR/CCY": "Erreur",
+                "CCY/EUR": "Erreur",
+                "Date": "-"
+            })
 
-    st.subheader("📊 Cross FX")
-    st.write(results)
+    df = pd.DataFrame(rows)
 
-    st.success("FX data loaded successfully from ECB API.")
+    st.subheader("📊 Cross FX avec drapeaux")
+    st.dataframe(df, use_container_width=True)
+    st.markdown(
+        """
+        *Données récupérées via l’API publique de la Banque Centrale Européenne (ECB)*
+        """
+    )
