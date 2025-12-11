@@ -52,5 +52,5 @@ def render():
     if last_update:
         st.markdown(f"📅 **Date de calcul des données : `{last_update}`**")
 
-    st.subheader("📊 Taux spot ECB – Cross EUR/CCY")
+    st.subheader("📊 Taux spot ECB – EUR/CCY")
     st.dataframe(df, use_container_width=True)
